@@ -4,22 +4,22 @@ pipeline {
     stages {
         stage('Git Checkout') {
             steps {
-                git 'https://github.com/kenkool23/java-project.git'
+                git 'https://github.com/seeewhy/realcloud_java-new_project.git'
             }
         }
         stage('Build') {
             steps {
-                sh 'cd MyWebApp && mvn clean package'
+                sh 'SampleWebApp && mvn clean package'
             }
         }
         stage('Test') {
             steps {
-                sh 'cd MyWebApp mvn test'
+                sh 'cd SampleWebApp mvn test'
             }
         }
         stage('Deploy to Tomcat') {
             steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://34.227.56.60:8080/')], contextPath: 'path', war: '**/*.war'
+                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://18.188.105.217:8080//')], contextPath: 'path', war: '**/*.war'
             }
         }
     }
