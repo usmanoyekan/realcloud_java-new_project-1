@@ -1,18 +1,9 @@
+# configured aws provider with proper credentials
 provider "aws" {
   region     = "us-east-2"
-  profile = "default"
-  
+  profile    = "default"
 }
 
-# Create an EC2 Instance
-#resource "aws_instance" "firstinstance" {
- # ami           = "ami-0d5bf08bc8017c83b"
-  #instance_type = "t2.micro"
-
-  #tags = {
-   # Name = "Web-Server"
-  #}
-#}
 
 # Create a VPC
 
@@ -25,28 +16,28 @@ resource "aws_vpc" "prodvpc" {
   }
 }
 
+# Create a Subnet
 
-# Create Internet Gateway
+resource "aws_subnet" "prodsubnet1" {
+  vpc_id            = aws_vpc.prodvpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-2a"
+  map_public_ip_on_launch = true
+  
+  tags = {
+    Name = "prod-subnet"
+  }
+}
 
+#Create Internet Gateway
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.prodvpc.id
 
   tags = {
-    Name = "ProdIGW"
+    Name = "New"
   }
 }
 
-# Create a Subnet
-resource "aws_subnet" "prodsubnet1" {
-  vpc_id     = aws_vpc.prodvpc.id
-  cidr_block = "10.0.1.0/24"
-  availability_zone = "us-east-2a"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "prodSubnet"
-  }
-}
 # Create a Route Table
 resource "aws_route_table" "prodroute" {
   vpc_id = aws_vpc.prodvpc.id
@@ -56,68 +47,70 @@ resource "aws_route_table" "prodroute" {
     gateway_id = aws_internet_gateway.gw.id
   }
 
-  
+  route {
+    ipv6_cidr_block = "::/0"
+    gateway_id      = aws_internet_gateway.gw.id
+  }
 
   tags = {
     Name = "RT"
   }
 }
 
-# Associate subnet with Route Table
 
+#Associate subnet with Route Table
 resource "aws_route_table_association" "a" {
   subnet_id      = aws_subnet.prodsubnet1.id
   route_table_id = aws_route_table.prodroute.id
 }
 
-# Create security Group
+
+# Create a Security Group
 resource "aws_security_group" "allow_web" {
   name        = "allow_web"
-  description = "Allow WEB inbound traffic"
+  description = "Allow webserver inbound traffic"
   vpc_id      = aws_vpc.prodvpc.id
 
   ingress {
-    description      = "Webtraffic from VPC"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
+    description = "Web Traffic from VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
   }
 
   ingress {
-    description      = "SSH from VPC"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
   }
 
   ingress {
-    description      = "Webtraffic from VPC"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
-  }
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
 
+  }
   ingress {
-    description      = "Webtraffic from VPC"
-    from_port        = 8080
-    to_port          = 8080
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    
-  }
+    description = "HTTP"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
 
+  }
   egress {
     from_port        = 0
     to_port          = 0
     protocol         = "-1" # Any ip address/ any protocol
     cidr_blocks      = ["0.0.0.0/0"]
-    
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   tags = {
@@ -125,10 +118,42 @@ resource "aws_security_group" "allow_web" {
   }
 }
 
+resource "aws_instance" "firstinstance" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.allow_web.id]
+  subnet_id              = aws_subnet.prodsubnet1.id
+  key_name               = "new_key_pair-ohio"
+  availability_zone      = "us-east-2a"
+  user_data              =  "${file("install_jenkins.sh")}"
 
 
-# Use data source to get register ubuntu linux
+  tags = {
+    Name = "Jenkins_Server"
+  }
+}
+
+
+resource "aws_instance" "secondinstance" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.allow_web.id]
+  subnet_id              = aws_subnet.prodsubnet1.id
+  key_name               = "new_key_pair-ohio"
+  availability_zone      = "us-east-2a"
+  user_data              =  "${file("install_tomcat.sh")}"
+  
+
+
+  tags = {
+    Name = "Tomcat_Server"
+  }
+}
+
+
+# use data source to get a registered ubuntu ami
 data "aws_ami" "ubuntu" {
+
   most_recent = true
 
   filter {
@@ -141,28 +166,27 @@ data "aws_ami" "ubuntu" {
     values = ["hvm"]
   }
 
-  owners = ["099720109477"] # Canonical
+  owners = ["099720109477"]
 }
 
-
-
-# Create a Instance and security group
-
-resource "aws_instance" "firstinstance" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = "t2.micro"
-  subnet_id      = aws_subnet.prodsubnet1.id
-  vpc_security_group_ids    = [aws_security_group.allow_web.id]
-  key_name   = "new_key_pair-ohio"
-  availability_zone = "us-east-2a"
-  user_data = "${file("install_jenkins.sh")}"
-
-  tags = {
-    Name = "Jenkins-Server"
-  }
+# print the url of the jenkins server
+output "Jenkins_website_url" {
+  value     = join ("", ["http://", aws_instance.firstinstance.public_ip, ":", "8080"])
+  description = "Jenkins Server is firstinstance"
 }
 
-output "website_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = join ("", ["http://", aws_instance.firstinstance.public_ip, ":", "8080"])
+# print the url of the tomcat server
+output "Tomcat_website_url1" {
+  value     = join ("", ["http://", aws_instance.secondinstance.public_ip, ":", "8080"])
+  description = "Tomcat Server is secondinstance"
 }
+
+#output "website-url" {
+ # value       = "${aws_instance.firstinstance.*.public_ip}"
+  #description = "PublicIP address details"
+#}
+# aws_instance.ec2_instance.public_dns
+
+
+
+
