@@ -2,11 +2,7 @@ pipeline {
     agent any
 
     stages {
-        stage('Git Checkout') {
-            steps {
-                git 'https://github.com/seeewhy/realcloud_java-new_project.git'
-            }
-        }
+        
         stage('Build') {
             steps {
                 sh ' cd SampleWebApp && mvn clean package'
