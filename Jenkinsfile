@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     stages {
-        stage('Git Checkout') {
+        stage('Test') {
             steps {
-                git 'https://github.com/seeewhy/realcloud_java-new_project.git'
+                sh 'cd SampleWebApp mvn test'
             }
         }
         stage('Build') {
@@ -12,14 +12,10 @@ pipeline {
                 sh 'SampleWebApp && mvn clean package'
             }
         }
-        stage('Test') {
-            steps {
-                sh 'cd SampleWebApp mvn test'
-            }
-        }
+        
         stage('Deploy to Tomcat') {
             steps {
-                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://18.188.105.217:8080//')], contextPath: 'path', war: '**/*.war'
+                deploy adapters: [tomcat9(credentialsId: 'tomcat', path: '', url: 'http://13.58.32.7:8080')], contextPath: 'webapp', war: '**/*.war'
             }
         }
     }
